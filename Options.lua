@@ -1,4 +1,3 @@
-
 -- OmniBar by Jordon
 
 local addonName, addon = ...
@@ -83,6 +82,26 @@ local function GetSpellTooltipText(spellID)
 	if not line then return end
 	tooltip:Hide()
 	return line
+end
+
+local function SafeGetSpellInfo(spellID)
+    if not spellID then return nil, nil end
+    
+    local name, _, icon
+    if C_Spell and C_Spell.GetSpellInfo then
+        local spellInfo = C_Spell.GetSpellInfo(spellID)
+        if type(spellInfo) == "table" then
+            name = spellInfo.name
+            icon = spellInfo.iconID
+        else
+            name = spellInfo
+            icon = C_Spell.GetSpellTexture(spellID)
+        end
+    else
+        name, _, icon = GetSpellInfo(spellID)
+    end
+    
+    return name or tostring(spellID), icon or 134400 -- 134400 is the question mark icon
 end
 
 local function IsSpellEnabled(info)
@@ -442,6 +461,26 @@ function OmniBar:AddBarToOptions(key, refresh)
 						end,
 						order = 20,
 					},
+					sortMethod = {
+						name = L["Sort Method"],
+						desc = L["Choose how icons are sorted"],
+						type = "select",
+						values = {
+							["player"] = L["Sort by Player"],
+							["cooldown"] = L["Sort by Remaining Cooldown"],
+						},
+						set = function(info, state)
+							local option = info[#info]
+							self.db.profile.bars[key][option] = state
+							OmniBar_Position(_G[key])
+						end,
+						order = 22,
+					},
+					sortMethodDesc = {
+						name = L["Choose how icons are sorted"] .. "\n",
+						type = "description",
+						order = 23,
+					},
 					lb5 = {
 						name = "",
 						type = "description",
@@ -537,6 +576,22 @@ function OmniBar:AddBarToOptions(key, refresh)
 						name = L["Set the transparency of unused icons"] .. "\n",
 						type = "description",
 						order = 109,
+					},
+					usedAlpha = {
+						name = L["Used Icon Transparency"],
+						desc = L["Set the transparency of active icons"],
+						isPercent = true,
+						type = "range",
+						min = 0,
+						max = 1,
+						step = 0.01,
+						order = 112,
+						width = "double",
+					},
+					usedAlphaDesc = {
+						name = L["Set the transparency of active icons"] .. "\n",
+						type = "description",
+						order = 113,
 					},
 					swipeAlpha = {
 						name = L["Swipe Transparency"],
@@ -752,8 +807,10 @@ function OmniBar:AddBarToOptions(key, refresh)
 				arg = key,
 				order = 3,
 			},
+			
 		},
 	}
+
 
 	self.options.args.bars.args[key].args.spells.args.copy = {
 		name = "Copy From: ",
@@ -1098,6 +1155,14 @@ end
 
 function OmniBar:SetupOptions()
 
+	
+	 self.tempFormValues = {
+        triggerSpellID = "",
+        targetSpellID = "",
+        reductionAmount = 3,
+        eventType = "SPELL_CAST_SUCCESS"
+    }
+    
 	for spellId, spell in pairs(OmniBar.db.global.cooldowns) do
 		customSpells[tostring(spellId)] = {
 			name = GetSpellName(spellId),
@@ -1193,6 +1258,158 @@ function OmniBar:SetupOptions()
 					return OmniBar.db.global.cooldowns[spellId][option]
 				end,
 			},
+			
+		},
+	}
+	self.options.args.cooldownReduction = {
+		name = L["Cooldown Reduction"],
+		type = "group",
+		order = 30,
+		args = {
+			description = {
+				type = "description",
+				name = "Configure which spells reduce the cooldown of other spells when cast",
+				order = 1,
+			},
+			addRule = {
+				type = "group",
+				inline = true,
+				name = "Add New Rule",
+				order = 2,
+				args = {
+					triggerSpellID = {
+						name = "Trigger Spell ID",
+						desc = "Spell ID that triggers the cooldown reduction",
+						type = "input",
+						width = "normal",
+						validate = function(info, val)
+							local spellID = tonumber(val)
+							return spellID and GetSpellInfo(spellID) and true or "Invalid Spell ID"
+						end,
+						set = function(info, val)
+							self.tempFormValues.triggerSpellID = val
+						end,
+						get = function(info)
+							return self.tempFormValues.triggerSpellID
+						end,
+						order = 1,
+					},
+					targetSpellID = {
+						name = "Target Spell ID",
+						desc = "Spell ID that has its cooldown reduced",
+						type = "input",
+						width = "normal",
+						validate = function(info, val)
+							local spellID = tonumber(val)
+							return spellID and GetSpellInfo(spellID) and true or "Invalid Spell ID"
+						end,
+						set = function(info, val)
+							self.tempFormValues.targetSpellID = val
+						end,
+						get = function(info)
+							return self.tempFormValues.targetSpellID
+						end,
+						order = 2,
+					},
+					reductionAmount = {
+						name = "Reduction (seconds)",
+						desc = "Amount of seconds to reduce the cooldown by",
+						type = "range",
+						min = 0,
+						max = 60,
+						step = 0.5,
+						width = "normal",
+						set = function(info, val)
+							self.tempFormValues.reductionAmount = val
+						end,
+						get = function(info)
+							return self.tempFormValues.reductionAmount
+						end,
+						order = 3,
+					},
+					eventType = {
+						name = "Event Type",
+						desc = "When this reduction should apply",
+						type = "select",
+						values = {
+							["SPELL_CAST_SUCCESS"] = "When Spell is Cast (works for channels)",
+							["SPELL_INTERRUPT"] = "When Spell Interrupts",
+							["SPELL_DAMAGE"] = "When Spell Deals Damage",
+							["ANY"] = "Any Event Type"
+						},
+						width = "normal",
+						set = function(info, val)
+							self.tempFormValues.eventType = val
+						end,
+						get = function(info)
+							return self.tempFormValues.eventType
+						end,
+						order = 4,
+					},
+					addButton = {
+						name = "Add Rule",
+						type = "execute",
+						width = "normal",
+						func = function(info)
+							local triggerID = tonumber(self.tempFormValues.triggerSpellID)
+							local targetID = tonumber(self.tempFormValues.targetSpellID)
+							local amount = self.tempFormValues.reductionAmount
+							local eventType = self.tempFormValues.eventType
+							
+							if not triggerID or not targetID then return end
+							
+							-- Initialize table structure if needed
+							if not self.db.global.cooldownReduction[triggerID] then
+								self.db.global.cooldownReduction[triggerID] = {}
+							end
+							
+							-- Add rule with event type
+							if eventType == "ANY" then
+								-- Just store the amount for backward compatibility
+								self.db.global.cooldownReduction[triggerID][targetID] = amount
+							else
+								-- Store a table with event info
+								self.db.global.cooldownReduction[triggerID][targetID] = {
+									amount = amount,
+									event = eventType
+								}
+							end
+							
+							-- Update addon table
+							if not addon.CooldownReduction[triggerID] then
+								addon.CooldownReduction[triggerID] = {}
+							end
+							
+							-- Update the addon table the same way
+							if eventType == "ANY" then
+								addon.CooldownReduction[triggerID][targetID] = amount
+							else
+								addon.CooldownReduction[triggerID][targetID] = {
+									amount = amount,
+									event = eventType
+								}
+							end
+							
+							-- Clear form values
+							self.tempFormValues.triggerSpellID = ""
+							self.tempFormValues.targetSpellID = ""
+							
+							-- Refresh UI
+							self:UpdateCooldownReductionOptions()
+						end,
+						order = 5,
+					},
+				},
+			},
+			rules = {
+				name = "Current Rules",
+				type = "group",
+				inline = true,
+				order = 3,
+				args = {
+					-- Will be populated dynamically
+				},
+			},
 		},
 	}
 
@@ -1202,8 +1419,85 @@ function OmniBar:SetupOptions()
 		LibDualSpec:EnhanceOptions(self.options.plugins.profiles.profiles, self.db)
 	end
 
+	self:UpdateCooldownReductionOptions()
+
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("OmniBar", self.options)
 	LibStub("AceConfigDialog-3.0"):AddToBlizOptions("OmniBar", "OmniBar")
+end
+
+function OmniBar:UpdateCooldownReductionOptions()
+    -- Clear existing rules UI
+    self.options.args.cooldownReduction.args.rules.args = {}
+    
+    local order = 1
+    for triggerID, targets in pairs(self.db.global.cooldownReduction) do
+        local triggerName, triggerIcon = SafeGetSpellInfo(triggerID)
+        
+        for targetID, ruleInfo in pairs(targets) do
+            local targetName, targetIcon = SafeGetSpellInfo(targetID)
+            local amount, eventType
+            
+            -- Handle both simple number format and complex table format
+            if type(ruleInfo) == "number" then
+                amount = ruleInfo
+                eventType = "ANY"
+            elseif type(ruleInfo) == "table" then
+                amount = ruleInfo.amount
+                eventType = ruleInfo.event or "ANY"
+            else
+                -- Skip invalid entries
+                break
+            end
+            
+            -- Create readable event text
+            local eventText = ""
+            if eventType == "SPELL_INTERRUPT" then
+                eventText = " (on interrupt)"
+            elseif eventType == "SPELL_CAST_SUCCESS" then
+                eventText = " (on cast)"
+            elseif eventType == "SPELL_DAMAGE" then
+                eventText = " (on damage)"
+            elseif eventType == "SPELL_PERIODIC_DAMAGE" then
+                eventText = " (on tick)"
+            elseif eventType == "ANY" then
+                eventText = " (any event)"
+            end
+            
+            local ruleID = tostring(triggerID) .. "_" .. tostring(targetID)
+            self.options.args.cooldownReduction.args.rules.args[ruleID] = {
+                name = string.format("|T%s:20|t %s (%d) → |T%s:20|t %s (%d) (-%.1fs%s)", 
+    triggerIcon or "", triggerName or "Unknown", tonumber(triggerID), 
+    targetIcon or "", targetName or "Unknown", tonumber(targetID), 
+    amount or 0, eventText),
+                type = "execute",
+                width = "full",
+                func = function()
+                    -- Remove rule
+                    self.db.global.cooldownReduction[triggerID][targetID] = nil
+                    if not next(self.db.global.cooldownReduction[triggerID]) then
+                        self.db.global.cooldownReduction[triggerID] = nil
+                    end
+                    
+                    -- Update addon table
+                    if addon.CooldownReduction[triggerID] then
+                        addon.CooldownReduction[triggerID][targetID] = nil
+                        if not next(addon.CooldownReduction[triggerID]) then
+                            addon.CooldownReduction[triggerID] = nil
+                        end
+                    end
+                    
+                    -- Refresh UI
+                    self:UpdateCooldownReductionOptions()
+                end,
+                desc = "Click to remove this rule",
+                order = order,
+            }
+            order = order + 1
+        end
+    end
+    
+    -- Notify changes
+    LibStub("AceConfigRegistry-3.0"):NotifyChange("OmniBar")
 end
 
 local AceGUI = LibStub("AceGUI-3.0")

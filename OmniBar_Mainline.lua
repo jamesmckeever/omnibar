@@ -9,7 +9,10 @@ addon.Resets = {
          - Spell Lock
       ]]
     [111897] = {119910},
-    [133] = {{spellID = 190319, amount = 3}}
+    [133] = {{spellID = 190319, amount = 3}},
+	-- [342247] = {{spellID = 212653, amount = 21}},
+	-- [342247] = {1953}
+	[235219] = {45438},
 }
 
 addon.Cooldowns = {
@@ -181,8 +184,8 @@ addon.Cooldowns = {
 		[471195] = {parent = 633}, -- Lay on Hands (30% Armor increase)
     [642] = {duration = 210, class = "PALADIN"}, -- Divine Shield
     [853] = {duration = 30, class = "PALADIN"}, -- Hammer of Justice
-    [1022] = {duration = 240, class = "PALADIN", charges = 2}, -- Blessing of Protection
-    [1044] = {duration = 25, class = "PALADIN", charges = 2}, -- Blessing of Freedom
+    [1022] = {duration = 240, class = "PALADIN"}, -- Blessing of Protection
+    [1044] = {duration = 25, class = "PALADIN"}, -- Blessing of Freedom
     [6940] = {duration = 60, class = "PALADIN"}, -- Blessing of Sacrifice
 		[199448] = {parent = 6940, duration = 60}, -- Ultimate Sacrifice
     [20066] = {duration = 15, class = "PALADIN"}, -- Repentance
@@ -557,9 +560,9 @@ addon.Cooldowns = {
     [110959] = {duration = 120, class = "MAGE"}, -- Greater Invisibility
     [1953] = {duration = 11, class = "MAGE"}, -- Blink
     [212653] = {duration = 21, class = "MAGE", charges = 2}, -- Shimmer
-    [2139] = {default = true, duration = 20, class = "MAGE"}, -- Counterspell
+    [2139] = {default = true, duration = 24, class = "MAGE"}, -- Counterspell
     [11426] = {duration = 25, class = "MAGE"}, -- Ice Barrier
-    [45438] = {duration = 180, class = "MAGE"}, -- Ice Block
+    [45438] = {duration = 240, class = "MAGE"}, -- Ice Block
 	        [414658] = {parent = 45438}, -- Ice Cold
     [55342] = {duration = 120, class = "MAGE"}, -- Mirror Image
     [80353] = {duration = 300, class = "MAGE"}, -- Time Warp
@@ -573,7 +576,7 @@ addon.Cooldowns = {
     [353082] = {duration = 25, class = "MAGE"}, -- Ring of Fire
     [352278] = {duration = 90, class = "MAGE"}, -- Ice Wall
     [122] = {duration = 30, class = "MAGE", charges = 2}, -- Frost Nova
-    [342245] = {duration = 50, class = "MAGE"}, -- Alter Time
+    [342246] = {duration = 50, class = "MAGE"}, -- Alter Time
     [475] = {duration = 8, class = "MAGE"}, -- Remove Curse
     [157980] = {duration = 45, class = "MAGE"}, -- Supernova
 		[449700] = {parent = 157980, duration = 40}, -- Gravity Lapse
@@ -719,7 +722,8 @@ addon.Cooldowns = {
     [360995] = {duration = 16, class = "EVOKER"}, -- Verdant Embrace
     [357214] = {duration = 60, class = "EVOKER"}, -- Wing Buffet
     [368970] = {duration = 180, class = "EVOKER"}, -- Tail Swipe
-    [351338] = {default = true, duration = {default = 20, [1468] = 40}, class = "EVOKER"}, -- Quell
+    --[351338] = {default = true, duration = {default = 20, [1468] = 40}, class = "EVOKER"}, -- Quell
+	[351338] = {default = true, duration = {default = 40, [1467] = 20}, class = "EVOKER"}, -- Quell
     [374251] = {duration = 60, class = "EVOKER"}, -- Cauterizing Flame
     [360806] = {duration = 15, class = "EVOKER"}, -- Sleep Walk
     [370553] = {duration = 120, class = "EVOKER"}, -- Tip the Scales
