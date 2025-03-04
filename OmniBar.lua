@@ -71,7 +71,9 @@ local CHANNELED_SPELLS = {
 
 }
 
-
+local CHANNELED_SPELLS_CAST_ONLY = {
+    [382445] = true, -- Shifting Power
+}
 
 
 local function GetSpellName(id)
@@ -1768,7 +1770,7 @@ function OmniBar:AddSpellCast(event, sourceGUID, sourceName, sourceFlags, spellI
             if type(reset) == "table" and reset.amount then
                 if self.spellCasts[name][reset.spellID] then
                     self.spellCasts[name][reset.spellID].duration = self.spellCasts[name][reset.spellID].duration -
-                    reset.amount
+                        reset.amount
                     if self.spellCasts[name][reset.spellID].duration < 1 then
                         self.spellCasts[name][reset.spellID] = nil
                     end
@@ -1863,12 +1865,15 @@ function OmniBar:COMBAT_LOG_EVENT_UNFILTERED()
     local timestamp, subevent, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, destRaidFlags, spellID, spellName =
     CombatLogGetCurrentEventInfo()
 
+    -- Define Shifting Power as a special case - only apply CDR on cast success
+    local CHANNELED_SPELLS_CAST_ONLY = {
+        [382445] = true, -- Shifting Power
+    }
 
     if (subevent == "SPELL_CAST_SUCCESS" or subevent == "SPELL_AURA_APPLIED" or subevent == "SPELL_INTERRUPT") then
         if spellID == 0 and SPELL_ID_BY_NAME then spellID = SPELL_ID_BY_NAME[spellName] end
         self:AddSpellCast(subevent, sourceGUID, sourceName, sourceFlags, spellID)
     end
-
 
     if CHANNELED_SPELLS[spellID] then
         if subevent == "SPELL_CAST_SUCCESS" then
@@ -1883,19 +1888,22 @@ function OmniBar:COMBAT_LOG_EVENT_UNFILTERED()
         elseif subevent == "SPELL_PERIODIC_DAMAGE" or subevent == "SPELL_PERIODIC_HEAL" or
             subevent == "SPELL_DAMAGE" or subevent:match("^SPELL_") then
             local channelInfo = self.activeChannels[sourceGUID]
-            if channelInfo and channelInfo.spellID == spellID then
+            -- Skip cooldown reduction for Shifting Power entirely in this block
+            if channelInfo and channelInfo.spellID == spellID and not CHANNELED_SPELLS_CAST_ONLY[spellID] then
                 self:ProcessCooldownReduction(spellID, sourceGUID, sourceName, "SPELL_CHANNEL_TICK")
             end
         end
     end
 
-
-    if subevent == "SPELL_INTERRUPT" or subevent == "SPELL_CAST_SUCCESS" or
-        subevent == "SPELL_DAMAGE" or subevent == "SPELL_AURA_APPLIED" then
+    -- For regular CDR processing, ensure we're not double-counting channeled spells
+    -- Process Shifting Power only on SPELL_CAST_SUCCESS
+    if subevent == "SPELL_INTERRUPT" or 
+       subevent == "SPELL_CAST_SUCCESS" or
+       (subevent == "SPELL_DAMAGE" and not CHANNELED_SPELLS_CAST_ONLY[spellID]) or 
+       subevent == "SPELL_AURA_APPLIED" then
         self:ProcessCooldownReduction(spellID, sourceGUID, sourceName, subevent)
     end
 end
-
 function OmniBar:ProcessCooldownReduction(spellID, sourceGUID, sourceName, eventType)
     if not addon.CooldownReduction[spellID] then return end
 
@@ -2782,8 +2790,9 @@ function OmniBar_Position(self)
             count = count + 1
             if count >= columns then
                 if self.settings.align == "CENTER" then
-                    self.active[i]:SetPoint("CENTER", self.anchor, "CENTER", (-BASE_ICON_SIZE - padding) * (columns - 1) /
-                    2, (BASE_ICON_SIZE + padding) * rows * grow)
+                    self.active[i]:SetPoint("CENTER", self.anchor, "CENTER",
+                        (-BASE_ICON_SIZE - padding) * (columns - 1) /
+                        2, (BASE_ICON_SIZE + padding) * rows * grow)
                 else
                     self.active[i]:SetPoint(self.settings.align, self.anchor, self.settings.align, 0,
                         (BASE_ICON_SIZE + padding) * rows * grow)
